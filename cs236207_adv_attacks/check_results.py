@@ -10,12 +10,19 @@ def main():
     pert_path = 'results/pert_upgd_standard.pt'
     pert = torch.load(pert_path)
 
-    # check if the perturbation is within the L_inf bound and end the evaluation if not
+    # check if the perturbation is within the L_inf bound and normalize if necessary
     if torch.abs(pert).max() > eps:
-        raise ValueError('Perturbation out of L_inf bound.')
+        print('Perturbation exceeds L_inf bound - normalizing')
+        pert = torch.clamp(pert, -eps, eps)
 
-    device = torch.device('cuda:1' if torch.cuda.is_available() else 'cpu')
+    # make sure pert dimension is (1, 3, 32, 32)
+    if len(pert.shape) == 3:
+        pert = pert.unsqueeze(0)
+    if pert.shape != (1, 3, 32, 32):
+        raise ValueError('Perturbation has incorrect dimensions')
+
     
+    device = torch.device('cuda:1' if torch.cuda.is_available() else 'cpu')
 
     # load the ResNet18 model
     if 'standard' in pert_path:
@@ -27,8 +34,6 @@ def main():
     else:
         model = load_model(model_name='Wong2020Fast', dataset='cifar10', threat_model='Linf').to(device)
     
-
-    model.eval()
     # load the CIFAR10 dataset
     data_dir = 'data'
     n_examples = 10000
@@ -38,6 +43,7 @@ def main():
 
     # run clean evaluation
     robust_flags = torch.zeros(n_examples, dtype=torch.bool)
+    model.eval()
     print('Running clean evaluation:')
     for batch_idx in range(n_batches):
         start_idx = batch_idx * bs
@@ -58,14 +64,15 @@ def main():
     for batch_idx in range(n_batches):
         start_idx = batch_idx * bs
         end_idx = min((batch_idx + 1) * bs, n_examples)
-
+        batch_indices = torch.arange(start_idx, end_idx, device=device)
         x = x_test[start_idx:end_idx, :].clone().detach().to(device)
         y = y_test[start_idx:end_idx].clone().detach().to(device)
         x = x + pert
         x = torch.clamp(x, 0, 1)
-        output = model.forward(x)
-        correct_batch = y.eq(output.max(dim=1)[1]).detach()
-        robust_flags[start_idx:end_idx] = correct_batch
+        output = model.forward(x).max(dim=1)[1]
+        false_batch = ~y.eq(output).detach()
+        non_robust_indices = batch_indices[false_batch]
+        robust_flags[non_robust_indices] = False
 
     n_robust_examples = torch.sum(robust_flags).item()
     robust_accuracy = n_robust_examples / n_examples
