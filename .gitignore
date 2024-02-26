@@ -1,4 +1,7 @@
 __pycache__/
+data/
+models/
+results/
 *.pkl
 *.wtag
 *.pdf
@@ -7,5 +10,4 @@ __pycache__/
 *.zip
 *.pyc
 *.html
-
-
+*.txt
