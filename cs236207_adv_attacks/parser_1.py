@@ -30,8 +30,8 @@ def parse_args():
     parser.add_argument('--save_results', action='store_true',
                         help='save the produced results')
     # model args
-    # parser.add_argument('--model_name', type=str, default='', help='model name to load from robustness (default: use pretrained ResNet18 model)')
-    parser.add_argument('--model_name', type=str, default='Wong2020Fast', help='model name to load from robustness (default: use pretrained ResNet18 model)')
+    parser.add_argument('--model_name', type=str, default='', help='model name to load from robustness (default: use pretrained ResNet18 model)')
+    # parser.add_argument('--model_name', type=str, default='Wong2020Fast', help='model name to load from robustness (default: use pretrained ResNet18 model)')
     # Use --model_name Wong2020Fast for robust PreActResNet-18 model
     # attack args
     # pgd attacks args

@@ -41,7 +41,7 @@ class UPGD(Attack):
         # Initialize an optimizer for the perturbation
         optimizer = torch.optim.Adam([curr_pert], lr=0.01)
         # Cyclic scheduler for the learning rate, number of epochs is 30 so use 3 steps
-        schedualer = torch.optim.lr_scheduler.CyclicLR(optimizer, base_lr=0.01, max_lr=0.1, step_size_up=5, cycle_momentum=False)
+        # schedualer = torch.optim.lr_scheduler.CyclicLR(optimizer, base_lr=0.01, max_lr=0.1, step_size_up=5, cycle_momentum=False)
 
         update_freq = 5  # Update the perturbation every 'update_freq' batches
         batch_count = 0
@@ -81,13 +81,13 @@ class UPGD(Attack):
                 total += y_batch.size(0)
             accuracies.append(correct / total)
             # step but not in the first epoch
-            lr_before = optimizer.param_groups[0]['lr']
-            if epoch != 0:
-                if epoch % 8 == 0:
-                    schedualer.step()
-            lr_after = optimizer.param_groups[0]['lr']
-            if lr_before != lr_after:
-                tqdm.write(f'Learning rate changed from {lr_before} to {lr_after}')
+            # lr_before = optimizer.param_groups[0]['lr']
+            # if epoch != 0:
+            #     if epoch % 8 == 0:
+            #         schedualer.step()
+            # lr_after = optimizer.param_groups[0]['lr']
+            # if lr_before != lr_after:
+            #     tqdm.write(f'Learning rate changed from {lr_before} to {lr_after}')
         
         end_time = time.time()
         print(f'Elapsed time for training the attack: {end_time - start_time}')
