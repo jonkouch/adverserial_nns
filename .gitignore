@@ -1,0 +1,11 @@
+__pycache__/
+*.pkl
+*.wtag
+*.pdf
+*.csv
+*.png
+*.zip
+*.pyc
+*.html
+
+
