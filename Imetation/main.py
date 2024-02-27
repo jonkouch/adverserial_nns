@@ -9,6 +9,7 @@ from torchvision.models import resnet18  # Assuming you're using ResNet18 for st
 from robustbench.utils import load_model
 from tqdm.auto import tqdm
 import numpy as np
+from models.cifar10.resnet import ResNet18
 
 # Custom Transform: Add Epsilon-Bounded Noise
 class AddEpsilonNoise(object):
@@ -49,7 +50,7 @@ test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num
 # Models
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 teacher_model = load_model(model_name='Wong2020Fast', dataset='cifar10', threat_model='Linf').to(device)
-student_model = load_model(model_name='Standard', dataset='cifar10', threat_model='Linf').to(device)
+student_model = ResNet18(device).to(device)
 
 if torch.cuda.device_count() > 1:
     print(f"Let's use {torch.cuda.device_count()} GPUs!")
@@ -104,7 +105,7 @@ for epoch in range(epochs):
         # Update progress bar with real-time train loss
         average_train_loss = train_loss / num_batches_train
         progress_bar.set_description(
-            f'Epoch {epoch + 1}/{100}, Train Loss: {average_train_loss:.4f}, Test Loss: {average_test_loss:.4f}, Best Test Loss: {best_test_loss:.4f} @ Epoch {best_epoch}')
+            f'Epoch {epoch + 1}/{100}, Train Loss: {average_train_loss:.4f}, Test Loss: {average_test_loss:.4f}, Best Test Loss: {best_test_loss:.4f} @ Epoch {best_epoch}, lr = {scheduler.get_last_lr()}')
         progress_bar.update()
 
     # Testing phase
@@ -136,21 +137,19 @@ for epoch in range(epochs):
     if average_test_loss < best_test_loss:
         best_test_loss = average_test_loss
         best_epoch = epoch + 1
-        torch.save(student_model.state_dict(), f'student_model_best_{best_epoch}.pt')  # Save the best model
+        torch.save(student_model.state_dict(), f'student_model_new{best_epoch}.pt')  # Save the best model
 
     # Final update to progress bar at the end of epoch to include best test loss info
     progress_bar.set_description(
         f'Epoch {epoch + 1}/{100}, Train Loss: {average_train_loss:.4f}, Test Loss: {average_test_loss:.4f}, Best Test Loss: {best_test_loss:.4f} @ Epoch {best_epoch}')
     test_losses.append(average_test_loss)
     train_losses.append(average_train_loss)
-
-
     scheduler.step()
 
 progress_bar.close()
 
 # Save Model
-torch.save(student_model.state_dict(), 'final_student_model.pt')
+torch.save(student_model.state_dict(), 'new_final_student_model.pt')
 print("Model training complete and saved.")
 
 

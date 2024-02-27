@@ -1,5 +1,6 @@
 import torch
 from attacks.pgd_attacks.attack import Attack
+from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
 import matplotlib.pyplot as plt
@@ -25,7 +26,6 @@ class UPGD(Attack):
         self.loss = self.compute_loss(x_orig, y_orig, self.pert)
         self.adv_accuracy = self.compute_accuracy(x_orig, y_orig, self.pert)
 
-
     def train_attack1(self, x_orig, y_orig):
         if not isinstance(x_orig, torch.Tensor):
             x_orig = torch.tensor(x_orig, dtype=torch.float32)
@@ -38,12 +38,11 @@ class UPGD(Attack):
         curr_pert = torch.zeros_like(x_orig[0]).to(self.device)
         curr_pert.requires_grad = True
 
-        # Initialize an optimizer for the perturbation
-        optimizer = torch.optim.Adam([curr_pert], lr=0.01)
-        # Cyclic scheduler for the learning rate, number of epochs is 30 so use 3 steps
-        # schedualer = torch.optim.lr_scheduler.CyclicLR(optimizer, base_lr=0.01, max_lr=0.1, step_size_up=5, cycle_momentum=False)
+        optimizer = torch.optim.AdamW([curr_pert], lr=0.01)
+        # Using CosineAnnealingLR for learning rate adjustment
+        scheduler = CosineAnnealingLR(optimizer, T_max=self.n_iter, eta_min=0.001)  # Adjust T_max and eta_min as needed
 
-        update_freq = 5  # Update the perturbation every 'update_freq' batches
+        update_freq = 5
         batch_count = 0
 
         accuracies = []
@@ -63,23 +62,28 @@ class UPGD(Attack):
                 x_perturbed = torch.clamp(x_perturbed, 0, 1)
 
                 output = self.model(x_perturbed)
-                loss = -self.criterion(output, y_batch).mean()
-                loss.backward()
 
-                # Accumulate gradients over 'update_freq' batches
-                if (batch_count + 1) % update_freq == 0:
-                    optimizer.step()  # Update the perturbation
-                    optimizer.zero_grad()  # Zero gradients for optimizer
+                # Mask to select correctly classified examples
+                correct_preds = output.argmax(1) == y_batch
+                if correct_preds.any():
+                    loss = -self.criterion(output[correct_preds], y_batch[correct_preds]).mean()
+                    loss.backward()
 
-                    with torch.no_grad():
-                        # Optionally project the perturbation to ensure it stays within desired bounds after the update
-                        curr_pert[:] = self.project(curr_pert)
-                        curr_pert.requires_grad = True  # Re-enable gradient tracking
-                
+                    if (batch_count + 1) % update_freq == 0:
+                        optimizer.step()  # Update the perturbation
+                        optimizer.zero_grad()  # Zero gradients for optimizer
+
+                        with torch.no_grad():
+                            # Optionally project the perturbation to ensure it stays within desired bounds after the update
+                            curr_pert[:] = self.project(curr_pert)
+                            curr_pert.requires_grad = True  # Re-enable gradient tracking
+
                 batch_count += 1
-                correct += (output.argmax(1) == y_batch).sum().item()
+                correct += correct_preds.sum().item()
                 total += y_batch.size(0)
+
             accuracies.append(correct / total)
+            scheduler.step()  # Update learning rate
             # step but not in the first epoch
             # lr_before = optimizer.param_groups[0]['lr']
             # if epoch != 0:
