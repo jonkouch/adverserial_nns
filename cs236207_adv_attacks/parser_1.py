@@ -93,11 +93,12 @@ def compute_data_args(args):
 
 def compute_models_args(args):
     if args.model_name == 'Wong2020Fast':
-    if args.model_name == 'Wong2020Fast':
         args.model = load_model(args.model_name, dataset=args.dataset, threat_model='Linf').to(args.device)
     elif args.model_name == 'student':
         args.model = load_model('Standard', dataset=args.dataset, threat_model='Linf').to(args.device)
-        args.model.load_state_dict(torch.load('models/cifar10/student_model_best_699.pt', map_location=args.device))
+        state_dict = torch.load('models/cifar10/Linf/student_model_best_699.pt', map_location=args.device)
+        new_state_dict = {k.replace('module.', ''): v for k, v in state_dict.items()}
+        args.model.load_state_dict(new_state_dict)
     else:
         #cifar 10
         args.model_name = 'ResNet18'

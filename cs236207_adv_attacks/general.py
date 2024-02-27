@@ -4,6 +4,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
 
+# # Load the model
+# model_path = 'models/cifar10/Linf/student_model_best_699.pt'
+# model = torch.load(model_path, map_location=torch.device('cpu'))
+
+# # Print the model architecture
+# print(model)
+
+
 path = 'results/pert_upgd_robust.pt'
 pert = torch.load(path).detach().cpu().numpy()
 pert = np.transpose(pert, (1, 2, 0))
