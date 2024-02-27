@@ -41,9 +41,9 @@ class UPGD(Attack):
 
         optimizer = torch.optim.AdamW([curr_pert], lr=0.1)
         # Using CosineAnnealingLR for learning rate adjustment
-        scheduler = CosineAnnealingLR(optimizer, T_max=self.n_iter, eta_min=0.01)  # Adjust T_max and eta_min as needed
+        scheduler = CosineAnnealingLR(optimizer, T_max=self.n_iter, eta_min=0.001)  # Adjust T_max and eta_min as needed
 
-        update_freq = 5
+        update_freq = 10 # update the size of the batch size every epochs
         batch_count = 0
 
         accuracies = []
@@ -74,7 +74,7 @@ class UPGD(Attack):
                     epoch_loss += loss.item()
                     loss.backward()
 
-                    if (batch_count + 1) % (1+epoch//10) == 0:
+                    if (batch_count + 1) % (1+epoch//update_freq) == 0:
                         optimizer.step()  # Update the perturbation
                         optimizer.zero_grad()  # Zero gradients for optimizer
 
@@ -97,7 +97,7 @@ class UPGD(Attack):
             # lr_after = optimizer.param_groups[0]['lr']
             # if lr_before != lr_after:
             #     tqdm.write(f'Learning rate changed from {lr_before} to {lr_after}')
-            pbar.set_description(f"Epoch {epoch + 1}/{self.n_iter}, Loss: {epoch_loss / total:.4f}, Acc: {accuracies[-1] * 100:.2f}%, LR: {scheduler.get_last_lr()[0]:.5f}")
+            pbar.set_description(f"Epoch {epoch + 1}/{self.n_iter}, Loss: {epoch_loss / total:.4f}, Acc: {accuracies[-1] * 100:.2f}%, LR: {scheduler.get_last_lr()[0]:.5f}, batchsize = {self.batch_size* (1+epoch//update_freq)}")
             pbar.update()
         pbar.close()
         end_time = time.time()

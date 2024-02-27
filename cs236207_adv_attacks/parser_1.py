@@ -24,14 +24,14 @@ def parse_args():
     parser.add_argument('--dataset', type=str, default='cifar10', help='cifar10, cifar100, imagenet')
     parser.add_argument('--data_dir', type=str, default='./data')
     parser.add_argument('--n_examples', type=int, default=10000)
-    parser.add_argument('--batch_size', type=int, default=250)
+    parser.add_argument('--batch_size', type=int, default=64)
     parser.add_argument('--results_dir', type=str, default='./results')
     parser.add_argument('--report_info', action='store_true', help='additional info and non final results will be reported as well')
     parser.add_argument('--save_results', action='store_true',
                         help='save the produced results')
     # model args
-    # parser.add_argument('--model_name', type=str, default='', help='model name to load from robustness (default: use pretrained ResNet18 model)')
-    parser.add_argument('--model_name', type=str, default='Wong2020Fast', help='model name to load from robustness (default: use pretrained ResNet18 model)')
+    parser.add_argument('--model_name', type=str, default='', help='model name to load from robustness (default: use pretrained ResNet18 model)')
+    #parser.add_argument('--model_name', type=str, default='Wong2020Fast', help='model name to load from robustness (default: use pretrained ResNet18 model)')
     # parser.add_argument('--model_name', type=str, default='student', help='model name to load from robustness (default: use pretrained ResNet18 model)')
 
     # Use --model_name Wong2020Fast for robust PreActResNet-18 model
@@ -39,7 +39,7 @@ def parse_args():
     # pgd attacks args
     parser.add_argument('--attack', type=str, default='UPGD', help='PGD, UPGD')
     parser.add_argument('--eps_l_inf_from_255', type=int, default=8)
-    parser.add_argument('--n_iter', type=int, default=15)
+    parser.add_argument('--n_iter', type=int, default=30)
     parser.add_argument('--n_restarts', type=int, default=1, help='number of restart iterations for pgd_attacks')
     parser.add_argument('--alpha', type=float, default=0.01)
     parser.add_argument('--att_init_zeros', action='store_true', help='initialize the adversarial pertubation to zeroes (default: random initialization)')
