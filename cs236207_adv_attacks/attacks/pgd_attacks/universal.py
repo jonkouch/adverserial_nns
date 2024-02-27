@@ -22,10 +22,11 @@ class UPGD(Attack):
         super(UPGD, self).__init__(model, criterion, misc_args, pgd_args, name="UPGD")
 
         self.model_name = model_name
-        # self.pert = self.train_attack1(x_orig, y_orig)
-        self.pert = self.train_targeted_attack(x_orig, y_orig, 9)
+        self.pert = self.train_attack1(x_orig, y_orig)
+        # self.pert = self.train_targeted_attack(x_orig, y_orig, 9)
         self.loss = self.compute_loss(x_orig, y_orig, self.pert)
         self.adv_accuracy = self.compute_accuracy(x_orig, y_orig, self.pert)
+
 
     def train_attack1(self, x_orig, y_orig):
         if not isinstance(x_orig, torch.Tensor):
@@ -43,12 +44,14 @@ class UPGD(Attack):
         # Using CosineAnnealingLR for learning rate adjustment
         scheduler = CosineAnnealingLR(optimizer, T_max=self.n_iter, eta_min=0.01)  # Adjust T_max and eta_min as needed
 
-        update_freq = 5
         batch_count = 0
 
         accuracies = []
         start_time = time.time()
         pbar = tqdm(total=self.n_iter)
+        best_state = None
+        best_acc = 1
+        best_epoch = 0
         for epoch in range(self.n_iter):
             correct = 0
             total = 0
@@ -88,15 +91,15 @@ class UPGD(Attack):
                 total += y_batch.size(0)
 
             accuracies.append(correct / total)
+            epoch_acc = correct / total
+
             scheduler.step()  # Update learning rate
-            # step but not in the first epoch
-            # lr_before = optimizer.param_groups[0]['lr']
-            # if epoch != 0:
-            #     if epoch % 8 == 0:
-            #         schedualer.step()
-            # lr_after = optimizer.param_groups[0]['lr']
-            # if lr_before != lr_after:
-            #     tqdm.write(f'Learning rate changed from {lr_before} to {lr_after}')
+
+            if best_state is None or epoch_acc < best_acc:
+                best_state = curr_pert.clone().detach()
+                best_acc = epoch_acc
+                best_epoch = epoch
+
             pbar.set_description(f"Epoch {epoch + 1}/{self.n_iter}, Loss: {epoch_loss / total:.4f}, Acc: {accuracies[-1] * 100:.2f}%, LR: {scheduler.get_last_lr()[0]:.5f}")
             pbar.update()
         pbar.close()
@@ -115,11 +118,13 @@ class UPGD(Attack):
         plt.ylabel('Accuracy')
         plt.title(f'UPGD Accuracy over epochs - {title} model')
         # save the plot
-        path = f'results/upgd_accuracy_{title}.png'
+        path = f'results/plots/upgd_accuracy_{title}.png'
         plt.savefig(path)
         
-        path = f'results/pert_upgd_{title}.pt'
+        path = f'results/perts/pert_upgd_{title}.pt'
         torch.save(curr_pert, path)
+        torch.save(best_state, f'results/perts/best_pert_upgd_{title}_{best_epoch}.pt')
+
         return curr_pert
 
     
@@ -148,7 +153,6 @@ class UPGD(Attack):
 
         accuracies = []
         start_time = time.time()
-        update_freq = 5  # Update the perturbation every 'update_freq' batches
         batch_count = 0
         for epoch in tqdm(range(self.n_iter)):
             correct = 0
@@ -173,13 +177,12 @@ class UPGD(Attack):
                 loss = -self.criterion(output, target_labels).mean()
                 loss.backward()
 
-                # Accumulate gradients over 'update_freq' batches
-                if (batch_count + 1) % update_freq == 0:
-                    optimizer.step()
-                    optimizer.zero_grad()
-                
+                if (batch_count + 1) % (1+epoch//10) == 0:
+                    optimizer.step()  # Update the perturbation
+                    optimizer.zero_grad()  # Zero gradients for optimizer
+
                     with torch.no_grad():
-                        # Optionally project the perturbation to ensure it stays within desired bounds
+                        # Optionally project the perturbation to ensure it stays within desired bounds after the update
                         curr_pert[:] = self.project(curr_pert)
                         curr_pert.requires_grad = True  # Re-enable gradient tracking
                 

@@ -7,7 +7,7 @@ from robustbench.utils import load_model
 
 def main():
     eps = 8/255
-    pert_path = 'results/perts/pert_targeted_upgd_robust_target9.pt'
+    pert_path = 'results/perts/pert_upgd_standard.pt'
     pert = torch.load(pert_path)
 
     # check if the perturbation is within the L_inf bound and normalize if necessary
