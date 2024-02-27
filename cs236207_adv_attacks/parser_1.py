@@ -31,15 +31,15 @@ def parse_args():
                         help='save the produced results')
     # model args
     # parser.add_argument('--model_name', type=str, default='', help='model name to load from robustness (default: use pretrained ResNet18 model)')
-    # parser.add_argument('--model_name', type=str, default='Wong2020Fast', help='model name to load from robustness (default: use pretrained ResNet18 model)')
-    parser.add_argument('--model_name', type=str, default='student', help='model name to load from robustness (default: use pretrained ResNet18 model)')
+    parser.add_argument('--model_name', type=str, default='Wong2020Fast', help='model name to load from robustness (default: use pretrained ResNet18 model)')
+    # parser.add_argument('--model_name', type=str, default='student', help='model name to load from robustness (default: use pretrained ResNet18 model)')
 
     # Use --model_name Wong2020Fast for robust PreActResNet-18 model
     # attack args
     # pgd attacks args
     parser.add_argument('--attack', type=str, default='UPGD', help='PGD, UPGD')
     parser.add_argument('--eps_l_inf_from_255', type=int, default=8)
-    parser.add_argument('--n_iter', type=int, default=30)
+    parser.add_argument('--n_iter', type=int, default=15)
     parser.add_argument('--n_restarts', type=int, default=1, help='number of restart iterations for pgd_attacks')
     parser.add_argument('--alpha', type=float, default=0.01)
     parser.add_argument('--att_init_zeros', action='store_true', help='initialize the adversarial pertubation to zeroes (default: random initialization)')

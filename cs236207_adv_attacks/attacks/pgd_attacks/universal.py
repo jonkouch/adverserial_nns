@@ -21,7 +21,8 @@ class UPGD(Attack):
         super(UPGD, self).__init__(model, criterion, misc_args, pgd_args, name="UPGD")
 
         self.model_name = model_name
-        self.pert = self.train_attack1(x_orig, y_orig)
+        # self.pert = self.train_attack1(x_orig, y_orig)
+        self.pert = self.train_targeted_attack(x_orig, y_orig, 9)
         self.loss = self.compute_loss(x_orig, y_orig, self.pert)
         self.adv_accuracy = self.compute_accuracy(x_orig, y_orig, self.pert)
 
@@ -40,8 +41,6 @@ class UPGD(Attack):
 
         # Initialize an optimizer for the perturbation
         optimizer = torch.optim.Adam([curr_pert], lr=0.01)
-        # Cyclic scheduler for the learning rate, number of epochs is 30 so use 3 steps
-        # schedualer = torch.optim.lr_scheduler.CyclicLR(optimizer, base_lr=0.01, max_lr=0.1, step_size_up=5, cycle_momentum=False)
 
         update_freq = 5  # Update the perturbation every 'update_freq' batches
         batch_count = 0
@@ -80,14 +79,6 @@ class UPGD(Attack):
                 correct += (output.argmax(1) == y_batch).sum().item()
                 total += y_batch.size(0)
             accuracies.append(correct / total)
-            # step but not in the first epoch
-            # lr_before = optimizer.param_groups[0]['lr']
-            # if epoch != 0:
-            #     if epoch % 8 == 0:
-            #         schedualer.step()
-            # lr_after = optimizer.param_groups[0]['lr']
-            # if lr_before != lr_after:
-            #     tqdm.write(f'Learning rate changed from {lr_before} to {lr_after}')
         
         end_time = time.time()
         print(f'Elapsed time for training the attack: {end_time - start_time}')
@@ -112,6 +103,97 @@ class UPGD(Attack):
         return curr_pert
 
     
+    def train_targeted_attack(self, x_orig, y_orig, target):
+        """
+        Train a targeted attack
+        :param x_orig: input batch
+        :param y_orig: target batch
+        :param target: target label
+        """
+        if not isinstance(x_orig, torch.Tensor):
+            x_orig = torch.tensor(x_orig, dtype=torch.float32)
+        if not isinstance(y_orig, torch.Tensor):
+            y_orig = torch.tensor(y_orig, dtype=torch.long)
+
+        # Create a dataset and loader for the original data
+        dataset = TensorDataset(x_orig, y_orig)
+        loader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
+
+        # Initialize perturbation
+        curr_pert = torch.zeros_like(x_orig[0]).to(self.device)
+        curr_pert.requires_grad = True
+
+        # Optimizer for the perturbation
+        optimizer = torch.optim.AdamW([curr_pert], lr=0.01)
+
+        accuracies = []
+        start_time = time.time()
+        update_freq = 5  # Update the perturbation every 'update_freq' batches
+        batch_count = 0
+        for epoch in tqdm(range(self.n_iter)):
+            correct = 0
+            total = 0
+            for x_batch, y_batch in loader:  # Ignore y_orig here as we're targeting a specific class
+                x_batch = x_batch.to(self.device)
+                y_batch = y_batch.to(self.device)
+                self.model.zero_grad()  # Zero gradients for model
+
+                x_perturbed = x_batch + curr_pert
+                x_perturbed = torch.clamp(x_perturbed, 0, 1)  # Ensure perturbed image is valid
+
+                output = self.model(x_perturbed)
+                # Create a tensor of the target labels, anc change the target label to any other label
+                target_labels = torch.full_like(y_batch, target).to(self.device)
+                change_indices = torch.where(target_labels == y_batch)
+                target_labels[change_indices] = (target_labels[change_indices] + 1) % 10
+
+                total += y_batch.size(0)
+                correct += (output.argmax(1) == y_batch).sum().item()
+                
+                loss = -self.criterion(output, target_labels).mean()
+                loss.backward()
+
+                # Accumulate gradients over 'update_freq' batches
+                if (batch_count + 1) % update_freq == 0:
+                    optimizer.step()
+                    optimizer.zero_grad()
+                
+                    with torch.no_grad():
+                        # Optionally project the perturbation to ensure it stays within desired bounds
+                        curr_pert[:] = self.project(curr_pert)
+                        curr_pert.requires_grad = True  # Re-enable gradient tracking
+                
+                batch_count += 1
+
+            
+            accuracies.append(correct / total)
+
+        # Optionally, log or save results as done in train_attack1
+        path = f'results/pert_targeted_upgd_{self.model_name}_target{target}.pt'
+        torch.save(curr_pert, path)
+
+        end_time = time.time()
+        print(f'Elapsed time for training the attack: {end_time - start_time}')
+        print(f'Average time per epoch: {(end_time - start_time) / self.n_iter}')
+
+        if self.model_name == 'ResNet18':
+            title = 'standard'
+        else:
+            title = 'robust'
+
+
+        plt.plot(accuracies)
+        plt.xlabel('Epoch')
+        plt.ylabel('Accuracy')
+        plt.title(f'UPGD Accuracy over epochs - {title} model')
+        # save the plot
+        path = f'results/plots/upgd_accuracy_{title} - target{target}.png'
+        plt.savefig(path)
+        
+        path = f'results/perts/pert_targeted_upgd_{title}_target{target}.pt'
+        torch.save(curr_pert, path)
+        return curr_pert
+
     def train_attack_epgd(self, x_orig, y_orig, num_samples=5):
         if not isinstance(x_orig, torch.Tensor):
             x_orig = torch.tensor(x_orig, dtype=torch.float32)
@@ -125,7 +207,6 @@ class UPGD(Attack):
         curr_pert.requires_grad = True
 
         optimizer = torch.optim.Adam([curr_pert], lr=0.01)
-        schedualer = torch.optim.lr_scheduler.CyclicLR(optimizer, base_lr=0.01, max_lr=0.1, step_size_up=5, cycle_momentum=False)
 
         update_freq = 5
         batch_count = 0
@@ -182,13 +263,6 @@ class UPGD(Attack):
                 total += y_batch.size(0)
 
             accuracies.append(correct / total)
-            # lr_before = optimizer.param_groups[0]['lr']
-            # if epoch != 0:
-            #     if epoch % 8 == 0:
-            #         schedualer.step()
-            # lr_after = optimizer.param_groups[0]['lr']
-            # if lr_before != lr_after:
-            #     tqdm.write(f'Learning rate changed from {lr_before} to {lr_after}')
 
         if self.model_name == '':
             title = 'standard'
@@ -205,7 +279,6 @@ class UPGD(Attack):
         torch.save(curr_pert, path)
         return curr_pert
 
-        
 
     def report_schematics(self):
 
