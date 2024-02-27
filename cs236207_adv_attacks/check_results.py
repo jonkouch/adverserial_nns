@@ -29,7 +29,6 @@ def main():
         state_path = 'models/cifar10/resnet18.pt'
         model = ResNet18(device)
         model.load_state_dict(torch.load(state_path))
-
     # load the robust model
     else:
         model = load_model(model_name='Wong2020Fast', dataset='cifar10', threat_model='Linf').to(device)

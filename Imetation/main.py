@@ -74,10 +74,10 @@ best_epoch = 0
 test_losses, train_losses = [], []
 
 # Assuming the total size of train_loader and test_loader is known
-total_steps = 100 * (len(train_loader) + len(test_loader))
+total_steps = epochs * (len(train_loader) + len(test_loader))
 progress_bar = tqdm(total=total_steps, desc='Initial setup')
 average_test_loss = float('inf')
-for epoch in range(100):
+for epoch in range(epochs):
     student_model.train()
     train_loss = 0.0
     num_batches_train = 0
