@@ -30,8 +30,10 @@ def parse_args():
     parser.add_argument('--save_results', action='store_true',
                         help='save the produced results')
     # model args
-    parser.add_argument('--model_name', type=str, default='', help='model name to load from robustness (default: use pretrained ResNet18 model)')
+    # parser.add_argument('--model_name', type=str, default='', help='model name to load from robustness (default: use pretrained ResNet18 model)')
     # parser.add_argument('--model_name', type=str, default='Wong2020Fast', help='model name to load from robustness (default: use pretrained ResNet18 model)')
+    parser.add_argument('--model_name', type=str, default='student', help='model name to load from robustness (default: use pretrained ResNet18 model)')
+
     # Use --model_name Wong2020Fast for robust PreActResNet-18 model
     # attack args
     # pgd attacks args
@@ -90,8 +92,11 @@ def compute_data_args(args):
 
 
 def compute_models_args(args):
-    if len(args.model_name):
+    if args.model_name == 'Wong2020Fast':
         args.model = load_model(args.model_name, dataset=args.dataset, threat_model='Linf').to(args.device)
+    elif args.model_name == 'student':
+        args.model = load_model('Standard', dataset=args.dataset, threat_model='Linf').to(args.device)
+        args.model.load_state_dict(torch.load('models/cifar10/student_model_best_699.pt', map_location=args.device))
     else:
         #cifar 10
         args.model_name = 'ResNet18'
