@@ -1,5 +1,6 @@
 import torch
 from attacks.pgd_attacks.attack import Attack
+from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
 import matplotlib.pyplot as plt
@@ -26,7 +27,6 @@ class UPGD(Attack):
         self.loss = self.compute_loss(x_orig, y_orig, self.pert)
         self.adv_accuracy = self.compute_accuracy(x_orig, y_orig, self.pert)
 
-
     def train_attack1(self, x_orig, y_orig):
         if not isinstance(x_orig, torch.Tensor):
             x_orig = torch.tensor(x_orig, dtype=torch.float32)
@@ -39,17 +39,21 @@ class UPGD(Attack):
         curr_pert = torch.zeros_like(x_orig[0]).to(self.device)
         curr_pert.requires_grad = True
 
-        # Initialize an optimizer for the perturbation
-        optimizer = torch.optim.Adam([curr_pert], lr=0.01)
+        optimizer = torch.optim.AdamW([curr_pert], lr=0.1)
+        # Using CosineAnnealingLR for learning rate adjustment
+        scheduler = CosineAnnealingLR(optimizer, T_max=self.n_iter, eta_min=0.01)  # Adjust T_max and eta_min as needed
 
-        update_freq = 5  # Update the perturbation every 'update_freq' batches
+        update_freq = 5
         batch_count = 0
 
         accuracies = []
         start_time = time.time()
-        for epoch in tqdm(range(self.n_iter)):
+        pbar = tqdm(total=self.n_iter)
+        for epoch in range(self.n_iter):
             correct = 0
             total = 0
+            epoch_loss = 0
+
             for x_batch, y_batch in loader:
                 x_batch, y_batch = x_batch.to(self.device), y_batch.to(self.device)
 
@@ -62,24 +66,40 @@ class UPGD(Attack):
                 x_perturbed = torch.clamp(x_perturbed, 0, 1)
 
                 output = self.model(x_perturbed)
-                loss = -self.criterion(output, y_batch).mean()
-                loss.backward()
 
-                # Accumulate gradients over 'update_freq' batches
-                if (batch_count + 1) % update_freq == 0:
-                    optimizer.step()  # Update the perturbation
-                    optimizer.zero_grad()  # Zero gradients for optimizer
+                # Mask to select correctly classified examples
+                correct_preds = output.argmax(1) == y_batch
+                if correct_preds.any():
+                    loss = -self.criterion(output[correct_preds], y_batch[correct_preds]).mean()
+                    epoch_loss += loss.item()
+                    loss.backward()
 
-                    with torch.no_grad():
-                        # Optionally project the perturbation to ensure it stays within desired bounds after the update
-                        curr_pert[:] = self.project(curr_pert)
-                        curr_pert.requires_grad = True  # Re-enable gradient tracking
-                
+                    if (batch_count + 1) % (1+epoch//10) == 0:
+                        optimizer.step()  # Update the perturbation
+                        optimizer.zero_grad()  # Zero gradients for optimizer
+
+                        with torch.no_grad():
+                            # Optionally project the perturbation to ensure it stays within desired bounds after the update
+                            curr_pert[:] = self.project(curr_pert)
+                            curr_pert.requires_grad = True  # Re-enable gradient tracking
+
                 batch_count += 1
-                correct += (output.argmax(1) == y_batch).sum().item()
+                correct += correct_preds.sum().item()
                 total += y_batch.size(0)
+
             accuracies.append(correct / total)
-        
+            scheduler.step()  # Update learning rate
+            # step but not in the first epoch
+            # lr_before = optimizer.param_groups[0]['lr']
+            # if epoch != 0:
+            #     if epoch % 8 == 0:
+            #         schedualer.step()
+            # lr_after = optimizer.param_groups[0]['lr']
+            # if lr_before != lr_after:
+            #     tqdm.write(f'Learning rate changed from {lr_before} to {lr_after}')
+            pbar.set_description(f"Epoch {epoch + 1}/{self.n_iter}, Loss: {epoch_loss / total:.4f}, Acc: {accuracies[-1] * 100:.2f}%, LR: {scheduler.get_last_lr()[0]:.5f}")
+            pbar.update()
+        pbar.close()
         end_time = time.time()
         print(f'Elapsed time for training the attack: {end_time - start_time}')
         print(f'Average time per epoch: {(end_time - start_time) / self.n_iter}')
