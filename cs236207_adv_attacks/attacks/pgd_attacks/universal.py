@@ -42,8 +42,12 @@ class UPGD(Attack):
 
         optimizer = torch.optim.AdamW([curr_pert], lr=0.1)
         # Using CosineAnnealingLR for learning rate adjustment
-        scheduler = CosineAnnealingLR(optimizer, T_max=self.n_iter, eta_min=0.01)  # Adjust T_max and eta_min as needed
+        scheduler = CosineAnnealingLR(optimizer, T_max=self.n_iter, eta_min=0.001)  # Adjust T_max and eta_min as needed
 
+<<<<<<< HEAD
+=======
+        update_freq = 10 # update the size of the batch size every epochs
+>>>>>>> d6f6ff3e0ced5480bf58c745df4417c0802ed7ed
         batch_count = 0
 
         accuracies = []
@@ -77,7 +81,7 @@ class UPGD(Attack):
                     epoch_loss += loss.item()
                     loss.backward()
 
-                    if (batch_count + 1) % (1+epoch//10) == 0:
+                    if (batch_count + 1) % (1+epoch//update_freq) == 0:
                         optimizer.step()  # Update the perturbation
                         optimizer.zero_grad()  # Zero gradients for optimizer
 
@@ -94,6 +98,7 @@ class UPGD(Attack):
             epoch_acc = correct / total
 
             scheduler.step()  # Update learning rate
+<<<<<<< HEAD
 
             if best_state is None or epoch_acc < best_acc:
                 best_state = curr_pert.clone().detach()
@@ -101,6 +106,17 @@ class UPGD(Attack):
                 best_epoch = epoch
 
             pbar.set_description(f"Epoch {epoch + 1}/{self.n_iter}, Loss: {epoch_loss / total:.4f}, Acc: {accuracies[-1] * 100:.2f}%, LR: {scheduler.get_last_lr()[0]:.5f}")
+=======
+            # step but not in the first epoch
+            # lr_before = optimizer.param_groups[0]['lr']
+            # if epoch != 0:
+            #     if epoch % 8 == 0:
+            #         schedualer.step()
+            # lr_after = optimizer.param_groups[0]['lr']
+            # if lr_before != lr_after:
+            #     tqdm.write(f'Learning rate changed from {lr_before} to {lr_after}')
+            pbar.set_description(f"Epoch {epoch + 1}/{self.n_iter}, Loss: {epoch_loss / total:.4f}, Acc: {accuracies[-1] * 100:.2f}%, LR: {scheduler.get_last_lr()[0]:.5f}, batchsize = {self.batch_size* (1+epoch//update_freq)}")
+>>>>>>> d6f6ff3e0ced5480bf58c745df4417c0802ed7ed
             pbar.update()
         pbar.close()
         end_time = time.time()
