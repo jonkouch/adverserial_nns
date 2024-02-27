@@ -93,6 +93,7 @@ def compute_data_args(args):
 
 def compute_models_args(args):
     if args.model_name == 'Wong2020Fast':
+    if args.model_name == 'Wong2020Fast':
         args.model = load_model(args.model_name, dataset=args.dataset, threat_model='Linf').to(args.device)
     elif args.model_name == 'student':
         args.model = load_model('Standard', dataset=args.dataset, threat_model='Linf').to(args.device)
